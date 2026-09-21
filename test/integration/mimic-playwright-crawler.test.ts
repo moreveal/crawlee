@@ -513,29 +513,13 @@ describe.skipIf(!existsSync(mimicPath))('PlaywrightCrawler with local Mimic', ()
         expect(finalErrors[0]).toContain('2: 500');
     }, 120_000);
 
-    test.fails('TODO compatibility: returns coherent PNG, JPEG, clipped and state-sensitive screenshot bytes', async () => {
+    test('reports page.screenshot as explicitly unsupported', async () => {
         const crawler = new PlaywrightCrawler({
             mimicPath,
             maxConcurrency: 1,
             maxRequestRetries: 0,
             async requestHandler({ page }) {
-                const png = await page.screenshot({ type: 'png' });
-                const repeated = await page.screenshot({ type: 'png' });
-                expect(png.length).toBeGreaterThan(64);
-                expect(png.subarray(0, 8)).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
-                expect(repeated).toEqual(png);
-
-                await page.locator('#mutate').click();
-                const changed = await page.screenshot({ type: 'png' });
-                expect(changed).not.toEqual(png);
-
-                const clipped = await page.screenshot({ type: 'png', clip: { x: 0, y: 0, width: 64, height: 32 } });
-                expect(clipped.subarray(0, 8)).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
-                expect(clipped).not.toEqual(changed);
-
-                const jpeg = await page.screenshot({ type: 'jpeg', quality: 80 });
-                expect(jpeg.length).toBeGreaterThan(32);
-                expect(jpeg.subarray(0, 3)).toEqual(Buffer.from([0xff, 0xd8, 0xff]));
+                await expect(page.screenshot({ type: 'png' })).rejects.toThrow(/Page\.captureScreenshot.*not implemented/);
             },
         });
 
@@ -544,7 +528,7 @@ describe.skipIf(!existsSync(mimicPath))('PlaywrightCrawler with local Mimic', ()
         expect(stats.requestsFailed).toBe(0);
     }, 120_000);
 
-    test.fails('TODO compatibility: exposes attachment downloads through listDownloads()', async () => {
+    test('exposes attachment downloads through listDownloads()', async () => {
         const crawler = new PlaywrightCrawler({
             mimicPath,
             maxConcurrency: 1,
@@ -557,7 +541,11 @@ describe.skipIf(!existsSync(mimicPath))('PlaywrightCrawler with local Mimic', ()
                 const downloads = await listDownloads();
                 expect(downloads).toHaveLength(1);
                 expect(downloads[0].suggestedFilename()).toBe('fixture.txt');
-                expect((await downloads[0].createReadStream())?.readable).toBe(true);
+                const stream = await downloads[0].createReadStream();
+                expect(stream).not.toBeNull();
+                const chunks: Buffer[] = [];
+                for await (const chunk of stream!) chunks.push(Buffer.from(chunk));
+                expect(Buffer.concat(chunks).toString()).toBe('download contents');
             },
         });
 
@@ -566,7 +554,7 @@ describe.skipIf(!existsSync(mimicPath))('PlaywrightCrawler with local Mimic', ()
         expect(stats.requestsFailed).toBe(0);
     }, 120_000);
 
-    test.fails('TODO compatibility: applies timezoneId through Emulation.setTimezoneOverride', async () => {
+    test('applies timezoneId through Emulation.setTimezoneOverride', async () => {
         const browserPool = playwrightBrowserPool({
             launchContext: { mimicPath, launchOptions: { timezoneId: 'Pacific/Tahiti' } },
             useFingerprints: false,
@@ -578,6 +566,7 @@ describe.skipIf(!existsSync(mimicPath))('PlaywrightCrawler with local Mimic', ()
                 expect(await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone)).toBe(
                     'Pacific/Tahiti',
                 );
+                expect(await page.evaluate(() => new Date(0).getTimezoneOffset())).toBe(600);
             },
         });
 
