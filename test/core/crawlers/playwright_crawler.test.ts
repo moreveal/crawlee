@@ -230,7 +230,28 @@ describe('PlaywrightCrawler', () => {
             expect(
                 () => new PlaywrightCrawler({ browserPool, launchContext: { launcher: playwright.firefox } }),
             ).toThrow('PlaywrightCrawler: `launchContext` cannot be combined with `browserPool`');
+            expect(() => new PlaywrightCrawler({ browserPool, mimicPath: 'mimic-test-binary' })).toThrow(
+                'PlaywrightCrawler: `mimicPath` cannot be combined with `browserPool`',
+            );
             expect(() => new PlaywrightCrawler({ browserPool })).not.toThrow();
+        });
+
+        test('rejects Mimic with the remote browser provider', () => {
+            expect(
+                () =>
+                    new PlaywrightCrawler({
+                        mimicPath: 'mimic-test-binary',
+                        remoteBrowser: { endpoint: 'http://remote-browser.test' },
+                    }),
+            ).toThrow('PlaywrightCrawlerOptions.mimicPath cannot be combined with remoteBrowser.');
+
+            expect(
+                () =>
+                    new PlaywrightCrawler({
+                        launchContext: { mimicPath: 'mimic-test-binary' },
+                        remoteBrowser: { endpoint: 'http://remote-browser.test' },
+                    }),
+            ).toThrow('PlaywrightCrawlerOptions.mimicPath cannot be combined with remoteBrowser.');
         });
     });
 

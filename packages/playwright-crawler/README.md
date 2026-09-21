@@ -45,3 +45,28 @@ await crawler.run([
     'http://www.example.com/page-2',
 ]);
 ```
+
+## Using Mimic instead of Chromium
+
+Set `mimicPath` to a local [Mimic](https://github.com/moreveal/mimic)
+executable. Crawlee keeps its normal `BrowserPool`, resource limits, hooks, and
+retirement behavior. Each browser slot starts its own local Mimic process on an
+OS-assigned loopback port and connects Playwright to it over CDP. The process is
+stopped automatically when that browser slot closes.
+
+```javascript
+const crawler = new PlaywrightCrawler({
+    mimicPath: '/absolute/path/to/mimic',
+    maxConcurrency: 4,
+    async requestHandler({ page, request }) {
+        console.log(request.url, await page.title());
+    },
+});
+
+await crawler.run(['https://example.com']);
+```
+
+The same option is accepted inside `launchContext`, and by
+`launchPlaywright({ mimicPath: '...' })`. Mimic currently supports the Chromium
+launcher only. `remoteBrowser` and proxy configuration cannot be combined with
+`mimicPath`.

@@ -64,6 +64,15 @@ export interface PlaywrightCrawlerOptions<
     launchContext?: PlaywrightLaunchContext;
 
     /**
+     * Path to a local Mimic executable. When set, Crawlee starts and owns a
+     * Mimic process for every browser slot and connects to it over CDP instead
+     * of launching Chromium. Chromium launch options are not applied.
+     *
+     * Cannot be combined with `remoteBrowser` or `browserPool`.
+     */
+    mimicPath?: string;
+
+    /**
      * Whether to run browser in headless mode. Defaults to `true`.
      * Can be also set via {@apilink Configuration}.
      */
@@ -226,6 +235,7 @@ export class PlaywrightCrawler<
         ...BrowserCrawler.optionsShape,
         headless: z.boolean().optional(),
         launcher: schemas.anyObject.optional(),
+        mimicPath: z.string().min(1).optional(),
     };
 
     /** @internal */
@@ -239,8 +249,13 @@ export class PlaywrightCrawler<
     ) {
         const parsedOptions = parseArgument(options, PlaywrightCrawler.optionsSchema, 'PlaywrightCrawlerOptions');
 
-        const { launchContext, headless, configuration, contextPipelineBuilder, ...browserCrawlerOptions } =
+        const { launchContext, headless, configuration, contextPipelineBuilder, mimicPath, ...browserCrawlerOptions } =
             parsedOptions;
+
+        const resolvedMimicPath = mimicPath ?? launchContext.mimicPath;
+        if (resolvedMimicPath && parsedOptions.remoteBrowser) {
+            throw new Error('PlaywrightCrawlerOptions.mimicPath cannot be combined with remoteBrowser.');
+        }
 
         if (launchContext.proxyUrl) {
             throw new Error(
@@ -254,8 +269,11 @@ export class PlaywrightCrawler<
             assertBrowserPoolNotConfigured(new.target.name, {
                 launchContext: options.launchContext,
                 headless: options.headless,
+                mimicPath: options.mimicPath,
             });
         }
+
+        const resolvedLaunchContext = mimicPath ? { ...launchContext, mimicPath } : launchContext;
 
         super({
             ...(browserCrawlerOptions as unknown as PlaywrightCrawlerOptions<
@@ -264,12 +282,17 @@ export class PlaywrightCrawler<
                 Routes,
                 StatisticStateExtension
             >),
-            launchContext,
+            launchContext: resolvedLaunchContext,
             configuration,
             browserPoolBuilder: (remoteBrowser) =>
                 remoteBrowser
-                    ? remotePlaywrightBrowserPool({ ...remoteBrowser, launchContext, headless, configuration })
-                    : playwrightBrowserPool({ launchContext, headless, configuration }),
+                    ? remotePlaywrightBrowserPool({
+                          ...remoteBrowser,
+                          launchContext: resolvedLaunchContext,
+                          headless,
+                          configuration,
+                      })
+                    : playwrightBrowserPool({ launchContext: resolvedLaunchContext, headless, configuration }),
             contextPipelineBuilder: contextPipelineBuilder ?? (() => this.buildContextPipeline()),
         });
     }

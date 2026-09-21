@@ -5,6 +5,8 @@ import { parseArgument, schemas } from '@crawlee/utils/internal';
 import type { Browser, BrowserType, LaunchOptions } from 'playwright';
 import { z } from 'zod';
 
+import { MimicPlaywrightPlugin } from './mimic-playwright-plugin.js';
+
 /**
  * Apify extends the launch options of Playwright.
  * You can use any of the Playwright compatible
@@ -27,6 +29,18 @@ import { z } from 'zod';
  * ```
  */
 export interface PlaywrightLaunchContext extends BrowserLaunchContext<LaunchOptions, BrowserType> {
+    /** Path to a local Mimic executable to use in place of Chromium. */
+    mimicPath?: string;
+
+    /** Additional Mimic command-line arguments. Crawlee owns `--listen`. */
+    mimicArgs?: string[];
+
+    /** How long to wait for Mimic to publish its CDP endpoint. */
+    mimicStartupTimeoutMillis?: number;
+
+    /** How long to wait for Mimic to stop before killing it. */
+    mimicShutdownTimeoutMillis?: number;
+
     /**
      * `browserType.launch` [options](https://playwright.dev/docs/api/class-browsertype#browser-type-launch) or
      * `browserType.launchContextOptions` [options](https://playwright.dev/docs/api/class-browsertype#browser-type-launch-persistent-context)
@@ -86,6 +100,10 @@ export class PlaywrightLauncher extends BrowserLauncher<PlaywrightPlugin> {
         // Passthrough schemas — the launcher module object must keep its prototype through parsing.
         launcher: schemas.anyObject.optional(),
         launchContextOptions: schemas.anyObject.optional(),
+        mimicPath: z.string().min(1).optional(),
+        mimicArgs: z.array(z.string()).optional(),
+        mimicStartupTimeoutMillis: z.number().positive().optional(),
+        mimicShutdownTimeoutMillis: z.number().nonnegative().optional(),
     };
 
     /** @internal */
@@ -121,7 +139,7 @@ export class PlaywrightLauncher extends BrowserLauncher<PlaywrightPlugin> {
             configuration,
         );
 
-        this.Plugin = PlaywrightPlugin;
+        this.Plugin = parsedContext.mimicPath ? MimicPlaywrightPlugin : PlaywrightPlugin;
     }
 }
 

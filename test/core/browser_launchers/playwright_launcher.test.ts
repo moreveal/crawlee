@@ -9,6 +9,7 @@ import {
     BrowserLauncher,
     Configuration,
     launchPlaywright,
+    MimicPlaywrightPlugin,
     PlaywrightLauncher,
     serviceLocator,
 } from '@crawlee/playwright';
@@ -76,6 +77,18 @@ afterAll(async () => {
 }, 5000);
 
 describe('launchPlaywright()', () => {
+    test('uses a local Mimic plugin without replacing BrowserPool', () => {
+        const launcher = new PlaywrightLauncher({
+            mimicPath: 'mimic-test-binary',
+            launcher: { name: () => 'chromium' } as BrowserType,
+        });
+        const plugin = launcher.createBrowserPlugin();
+
+        expect(plugin).toBeInstanceOf(MimicPlaywrightPlugin);
+        expect(plugin.useIncognitoPages).toBe(true);
+        expect(plugin.remoteConnection).toBeUndefined();
+    });
+
     test('throws on invalid args', async () => {
         // @ts-expect-error Validating JS side
         await expect(launchPlaywright('some non-object')).rejects.toThrow(Error);
